@@ -1,0 +1,81 @@
+log_format antiddos '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"';
+limit_req_zone $server_name zone=global_limit:10m rate=200r/s;
+
+limit_req_zone $binary_remote_addr zone=anti_ddos_limit:10m rate=10r/s;
+limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+
+# HTTP : redirection globale vers HTTPS (+ stub_status)
+server {
+    listen 8080;
+    server_name localhost antiddos.duckdns.org;
+    set_real_ip_from 127.0.0.1;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+    access_log /var/log/nginx/access.log antiddos;
+    error_log  /var/log/nginx/error.log warn;
+
+    location /stub_status {
+        modsecurity off;
+        access_log off;
+        stub_status;
+        allow all;
+    }
+
+    location / {
+        return 301 https://antiddos.duckdns.org$request_uri;
+    }
+}
+
+# HTTPS : Application + Grafana
+server {
+    listen 8443 ssl;
+    http2 on;
+    server_name antiddos.duckdns.org;
+    set_real_ip_from 127.0.0.1;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    access_log /var/log/nginx/access.log antiddos;
+    error_log  /var/log/nginx/error.log warn;
+
+    modsecurity on;
+    modsecurity_rules_file /etc/modsecurity.d/antiddos.conf;
+    client_header_timeout 10s;
+    client_body_timeout 10s;
+    send_timeout 10s;
+
+    # Juice-Shop
+    location / {
+        limit_req zone=global_limit burst=50 nodelay;
+        limit_req zone=anti_ddos_limit burst=20 nodelay;
+        limit_req_status 429;
+        limit_conn conn_limit 20;
+
+        proxy_pass http://juice-shop:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+    }
+
+    # Grafana
+    location /grafana/ {
+        modsecurity off;
+        proxy_pass http://grafana:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+    }
+}

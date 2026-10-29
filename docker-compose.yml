@@ -1,0 +1,83 @@
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: juice-shop
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9092:9090"
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SERVER_ROOT_URL=https://antiddos.duckdns.org/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    ports:
+      - "3000:3000"
+    restart: always
+
+  nginx:
+    image: owasp/modsecurity-crs:nginx
+    container_name: nginx
+    ports:
+      - "80:8080"
+      - "443:8443"
+    environment:
+      - PORT=8080
+      - SSL_PORT=8443
+      - PROXY_SSL_CERT=/etc/nginx/certs/fullchain.pem
+      - PROXY_SSL_CERT_KEY=/etc/nginx/certs/privkey.pem
+      - SERVER_NAME=antiddos.duckdns.org
+      - BACKEND=http://juice-shop:3000
+      - MODSEC_RULE_ENGINE=On
+      - BLOCKING_PARANOIA=1
+      - ANOMALY_INBOUND=5
+      - ANOMALY_OUTBOUND=4
+    volumes:
+      - ./nginx/templates/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro,Z
+      - ./nginx/modsec/antiddos.conf:/etc/modsecurity.d/antiddos.conf:ro,Z
+      - /var/log/nginx-docker:/var/log/nginx
+      - /etc/nginx-certs:/etc/nginx/certs:ro,Z
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/stub_status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+    depends_on:
+      - juice-shop
+    restart: always
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx-exporter
+    ports:
+      - "9113:9113"
+    command:
+      - '--nginx.scrape-uri=http://nginx:8080/stub_status'
+    depends_on:
+      - nginx
+    restart: always
+
+  nginxlog-exporter:
+    image: quay.io/martinhelmich/prometheus-nginxlog-exporter:latest
+    container_name: nginxlog-exporter
+    command: ["-config-file", "/etc/nginxlog.yml"]
+    volumes:
+      - ./nginxlog/config.yml:/etc/nginxlog.yml:Z
+      - /var/log/nginx-docker:/var/log/nginx:ro
+    ports:
+      - "4040:4040"
+    depends_on:
+      - nginx
+    restart: always

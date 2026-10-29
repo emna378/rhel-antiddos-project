@@ -4,8 +4,8 @@
 [![Cybersecurity Engineering](https://img.shields.io/badge/Specialty-Cybersecurity%20Engineering-orange.svg)]()
 [![Status](https://img.shields.io/badge/Status-Completed-success.svg)]()
 
-> **Projet de Fin d'Études / Universitaire (5SSIR-D)**  
-> **Auteurs :** Emna Jlassi & Amani Aloui  
+> **Projet de Validation de Matière (Audit ISO 27001) — TEK-UP University**  
+> **Auteur :** Emna Jlassi  
 > **Établissement :** École Supérieure Privée de Technologie & Ingénierie (TEK-UP), Tunisie.
 
 ---
@@ -26,7 +26,7 @@ Ce projet étudie, conçoit et valide expérimentalement une architecture de dé
 
 ## 🏗️ 2. Architecture du Système (Défense en Profondeur)
 
-L'architecture repose sur un pipeline de filtrage strict où chaque couche intercepte un type specific de menace avant qu'elle n'atteigne l'application backend.
+L'architecture repose sur un pipeline de filtrage strict où chaque couche intercepte un type spécifique de menace avant qu'elle n'atteigne l'application backend.
 
 ```text
 [ Zone d'Attaque (Locust / Slowhttptest / PowerShell) ]

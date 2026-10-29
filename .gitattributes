@@ -1,0 +1,4 @@
+# Forcer le marquage des fichiers de configuration et Docker
+docker-compose.yml linguist-detectable=true
+*.yml linguist-language=YAML
+*.conf linguist-language=Nginx
